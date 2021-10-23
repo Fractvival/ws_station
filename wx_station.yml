@@ -1,0 +1,347 @@
+#####################
+## PROGMaxi & Bronek 
+## TEPLOTA A VLHKOST - AM2302 (odpor cca 10kOhm), PIN D2 nebo GPIO16
+## RYCHLOST VETRU - WH-SP-WS01, PIN D6 nebo GPIO12
+## SMER VETRU - WH-SP-WD, PIN A0
+## SRAZKOMER - MS-WH-SP-RG, PIN D7 nebo GPIO13
+## TESTOVANO NA WEMOS D1 R1
+## 
+##### 
+##### 
+#####################
+## Konfigurace ######
+## A0 - SMER VETRU
+## D0 - 
+## D1 - 
+## D2 - TEPLOTA A VLHKOST
+## D3 - 
+## D4 - 
+## D5 - 
+## D6 - RYCHLOST VETRU
+## D7 - SRAZKOMER
+## D8 - 
+#####################
+esphome:
+  name: wx_station
+  platform: ESP8266
+  board: d1
+
+wifi:
+  ssid: "Cisco"
+  password: "Hotentot1919"
+  ap:
+    ssid: "WStation"
+    password: "Hotentot1919"
+    ap_timeout: 5min
+  fast_connect: on
+  
+captive_portal:
+
+logger:
+
+api:
+  password: "Hotentot1919"
+  
+ota:
+  safe_mode: True
+  password: "Hotentot1919"
+
+i2c:
+  frequency: 100kHz #try for longer distance - currently works at 50' - 1 pair per 5v, Gnd, SDA, SCL
+
+sensor:
+
+  - platform: dht
+    pin: 
+      number: GPIO16
+    temperature:
+      name: "TEPLOTA"
+    humidity:
+      name: "VLHKOST"
+    update_interval: 10s      
+
+
+  - platform: pulse_counter
+    pin: 
+      #pin D5
+      number: GPIO12
+      mode: INPUT_PULLUP
+    unit_of_measurement: 'm/s' ##change to m/s if metric
+    name: 'RYCHLOST_VETRU'
+    icon: 'mdi:weather-windy'
+    id: my_wind
+    count_mode:
+      rising_edge: DISABLE
+      falling_edge: INCREMENT
+    internal_filter: 50us
+    update_interval: 8s 
+    filters:
+      - multiply: 0.0055578
+
+  - platform: pulse_counter
+    pin:
+      #pin D6
+      number: GPIO13
+      mode: INPUT_PULLUP
+    unit_of_measurement: 'mm'
+    name: 'SRAZKOMER'
+    icon: 'mdi:weather-rainy'
+    id: my_rain
+    internal: true
+    count_mode:
+      rising_edge: DISABLE
+      falling_edge: INCREMENT
+    internal_filter: 50us
+    update_interval: 9s
+    filters:
+      - multiply: 0.2794
+    accuracy_decimals: 3
+
+  - platform: integration
+    name: "SRAZKY_ZA_MINUTU"
+    id: rain_per_min
+    time_unit: min
+    unit_of_measurement: 'mm'
+    sensor: my_rain
+    
+  - platform: total_daily_energy
+    name: "SRAZKY_ZA_DEN"
+    power_id: my_rain
+    unit_of_measurement: 'mm' ###change to mm if metric
+    icon: 'mdi:weather-rainy'
+    # x60 To convert to aggregated rain amount
+    filters:
+      - multiply: 60
+
+  - platform: adc
+    id: adc_sensor
+    pin: A0
+    name: ADC
+    internal: true
+    update_interval: 7s
+    filters:
+      # - multiply: 3.3 ##built into Wemos
+      #- multiply: 0.0009775171   #1/1023
+    accuracy_decimals: 3 ##IMPORTANT to get resolution for resistance sensor
+
+  - platform: resistance
+    sensor: adc_sensor
+    id: resistance_sensor
+    configuration: DOWNSTREAM
+    resistor: 11.8kOhm
+    internal: true
+    name: "STANICE_ODPOR"
+    accuracy_decimals: 1
+    filters:
+      - heartbeat: 6s #thinking of increasing interval to plot better
+    on_value:
+      - if:
+          condition:
+            sensor.in_range:
+              id: resistance_sensor
+              above: 3400
+              below: 3700
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "S"
+            - sensor.template.publish:
+                id: wind_heading
+                state: 360.0
+                
+      - if:
+          condition:
+            sensor.in_range:
+              id: resistance_sensor
+              above: 4000
+              below: 4400
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "SZ"         
+            - sensor.template.publish:
+                id: wind_heading
+                state: 315.0            
+      - if:
+          condition:
+            sensor.in_range:
+              id: resistance_sensor
+              above: 4800
+              below: 4500
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "Z"                
+            - sensor.template.publish:
+                id: wind_heading
+                state: 270.0          
+      - if:
+          condition:
+            sensor.in_range:
+              id: resistance_sensor
+              above: 2400
+              below: 2800
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "JZ"    
+            - sensor.template.publish:
+                id: wind_heading
+                state: 225.0             
+      - if:
+          condition:
+            sensor.in_range:
+              id: resistance_sensor
+              above: 800
+              below: 1200
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "J"    
+            - sensor.template.publish:
+                id: wind_heading
+                state: 180.0            
+      - if:
+          condition:
+            sensor.in_range:
+              id: resistance_sensor
+              above: 500
+              below: 700
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "JV"    
+            - sensor.template.publish:
+                id: wind_heading
+                state: 135.0              
+      - if:
+          condition:
+            sensor.in_range:
+              id: resistance_sensor
+              above: 100
+              below: 400
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "V"    
+            - sensor.template.publish:
+                id: wind_heading
+                state: 90.0          
+      - if:
+          condition:
+            sensor.in_range:
+              id: resistance_sensor
+              above: 1500
+              below: 1900
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "SV"    
+            - sensor.template.publish:
+                id: wind_heading
+                state: 45.0
+
+  - platform: template
+    name: "UHEL_VETRU"
+    id: wind_heading
+    unit_of_measurement: "°"
+
+### ALREADY IN HOMEASSISTANT
+  # - platform: sun
+  #   name: Sun Elevation
+  #   type: elevation
+  #   update_interval: 120s
+
+  # - platform: sun
+  #   name: Sun Azimuth
+  #   type: azimuth
+  #   update_interval: 120s
+
+  # - platform: homeassistant
+  #   name: "Temperature F"
+  #   id: wxsta_temp_f
+  #   internal: true
+  #   entity_id: sensor.wxsta_temperature_2
+
+##################################
+### See https://gist.github.com/bassicrob/93fb0adc95261217fd4677dd7c34381c#file-wx-station-haconfiguration-yaml for HA Calculated Sensors
+##################################
+  - platform: homeassistant
+    name: "VITR_3M"
+    id: wind_3m_avg
+    internal: true 
+    unit_of_measurement: "km/h"
+    entity_id: sensor.wx_sta_wind_stats  
+    
+  # - platform: homeassistant
+  #   name: "Wind 3mAvg"
+  #   id: wind_10m_avg
+  #   internal: true 
+  #   unit_of_measurement: "MPH"
+  #   entity_id: sensor.wx_sta_wind_10m_stats
+    
+  - platform: homeassistant
+    id: wind_60m_gust
+    internal: true 
+    unit_of_measurement: "km/h"
+    entity_id: sensor.wx_sta_wind_60m_stats    
+#######
+## ADD Beufort - To Do
+#######
+
+####### ALREADY IN HOMEASSISTANT
+# sun:
+#   latitude: 40.7152681
+#   longitude: -73.8736255
+#######
+
+text_sensor:
+  - platform: template
+    name: "SMER_VETRU"
+    id: wind_dir_card
+
+####### ALREADY IN HOMEASSISTANT
+  # - platform: sun
+  #   name: Next Sunrise
+  #   type: sunrise
+  #   update_interval: 4h
+  # - platform: sun
+  #   name: Next Sunset
+  #   type: sunset
+  #   update_interval: 4h
+
+  - platform: wifi_info
+    ip_address:
+      name: Wx_sta IP Address
+    mac_address:
+      name: Wx_Sta Mac Wifi Address
+      
+
+#output:
+#  - platform: gpio
+#    pin: D7
+#    id: status_led_remote
+#interval:
+#  - interval: 30s
+#    then:
+#      - output.turn_on: status_led_remote
+#      - delay: 150ms
+#      - output.turn_off: status_led_remote
+#  - interval: 60s
+#    then:
+#      - sensor.integration.reset: rain_per_min   
+#  - interval: 5s
+#    then:
+#      - display.page.show_next: my_display
+#      - component.update: my_display
+# binary_sensor:
+#   - platform: template
+#     id: heat_index
+
+#   - platform: template
+#     id: wind_chill
+
+# Enable time component to reset energy at midnight
+time:
+  - platform: homeassistant
+    id: my_time

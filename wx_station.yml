@@ -27,13 +27,25 @@ esphome:
   board: d1
 
 wifi:
-  ssid: "Cisco"
-  password: "Hotentot1919"
+  networks:
+  - ssid: Vergl2
+    password: Hovnokleslo105
+    priority: 0.09
+  - ssid: Vergl
+    password: Hovnokleslo105
+    priority: 0.08
+  - ssid: Cisco
+    password: Hotentot1919
+    priority: 0.07
+  - ssid: Cisco
+    password: Hotentot1919
+    hidden: true
+    priority: 0.00
   ap:
     ssid: "WStation"
     password: "Hotentot1919"
     ap_timeout: 5min
-  fast_connect: on
+
   
 captive_portal:
 

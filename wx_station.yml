@@ -70,15 +70,14 @@ sensor:
       name: "TEPLOTA"
     humidity:
       name: "VLHKOST"
-    update_interval: 10s      
-
+    update_interval: 30s      
 
   - platform: pulse_counter
     pin: 
       #pin D5
       number: GPIO12
       mode: INPUT_PULLUP
-    unit_of_measurement: 'm/s' ##change to m/s if metric
+    unit_of_measurement: 'm/s'
     name: 'RYCHLOST_VETRU'
     icon: 'mdi:weather-windy'
     id: my_wind
@@ -86,9 +85,22 @@ sensor:
       rising_edge: DISABLE
       falling_edge: INCREMENT
     internal_filter: 50us
-    update_interval: 8s 
+    update_interval: 60s 
+    on_raw_value:
+      then:
+        - sensor.template.publish:
+            id: template_sens
+            state: !lambda "return x;"
+    #rotations_per_sec = pulses/2/60
+    #circ_m=0.09*2*3.14 = 0.5652
+    #mps = 1.18*circ_m*rotations_per_sec  
+    #mps = 1.18*0.5652/2/60 =0,0055578
+    accuracy_decimals: 2
     filters:
       - multiply: 0.0055578
+      - sliding_window_moving_average:
+          window_size: 2
+          send_every: 1
 
   - platform: pulse_counter
     pin:
@@ -109,6 +121,17 @@ sensor:
       - multiply: 0.2794
     accuracy_decimals: 3
 
+  - platform: template
+    name: "Template Sensor"
+    id: template_sens
+    filters:
+#      - multiply: 0.2794
+#      - multiply: 60 (to get mm/h)
+      - multiply: 16.764
+      - sliding_window_moving_average:
+          window_size: 60
+          send_every: 1
+
   - platform: integration
     name: "SRAZKY_ZA_MINUTU"
     id: rain_per_min
@@ -119,9 +142,8 @@ sensor:
   - platform: total_daily_energy
     name: "SRAZKY_ZA_DEN"
     power_id: my_rain
-    unit_of_measurement: 'mm' ###change to mm if metric
+    unit_of_measurement: 'mm'
     icon: 'mdi:weather-rainy'
-    # x60 To convert to aggregated rain amount
     filters:
       - multiply: 60
 
@@ -130,7 +152,7 @@ sensor:
     pin: A0
     name: ADC
     internal: true
-    update_interval: 7s
+    update_interval: 60s
     filters:
       # - multiply: 3.3 ##built into Wemos
       #- multiply: 0.0009775171   #1/1023
@@ -145,7 +167,7 @@ sensor:
     name: "STANICE_ODPOR"
     accuracy_decimals: 1
     filters:
-      - heartbeat: 6s #thinking of increasing interval to plot better
+      - heartbeat: 90s #thinking of increasing interval to plot better
     on_value:
       - if:
           condition:
@@ -258,102 +280,30 @@ sensor:
     id: wind_heading
     unit_of_measurement: "°"
 
-### ALREADY IN HOMEASSISTANT
-  # - platform: sun
-  #   name: Sun Elevation
-  #   type: elevation
-  #   update_interval: 120s
-
-  # - platform: sun
-  #   name: Sun Azimuth
-  #   type: azimuth
-  #   update_interval: 120s
-
-  # - platform: homeassistant
-  #   name: "Temperature F"
-  #   id: wxsta_temp_f
-  #   internal: true
-  #   entity_id: sensor.wxsta_temperature_2
-
-##################################
-### See https://gist.github.com/bassicrob/93fb0adc95261217fd4677dd7c34381c#file-wx-station-haconfiguration-yaml for HA Calculated Sensors
-##################################
   - platform: homeassistant
     name: "VITR_3M"
     id: wind_3m_avg
     internal: true 
     unit_of_measurement: "km/h"
     entity_id: sensor.wx_sta_wind_stats  
-    
-  # - platform: homeassistant
-  #   name: "Wind 3mAvg"
-  #   id: wind_10m_avg
-  #   internal: true 
-  #   unit_of_measurement: "MPH"
-  #   entity_id: sensor.wx_sta_wind_10m_stats
-    
+
   - platform: homeassistant
     id: wind_60m_gust
     internal: true 
     unit_of_measurement: "km/h"
     entity_id: sensor.wx_sta_wind_60m_stats    
-#######
-## ADD Beufort - To Do
-#######
-
-####### ALREADY IN HOMEASSISTANT
-# sun:
-#   latitude: 40.7152681
-#   longitude: -73.8736255
-#######
 
 text_sensor:
   - platform: template
     name: "SMER_VETRU"
     id: wind_dir_card
 
-####### ALREADY IN HOMEASSISTANT
-  # - platform: sun
-  #   name: Next Sunrise
-  #   type: sunrise
-  #   update_interval: 4h
-  # - platform: sun
-  #   name: Next Sunset
-  #   type: sunset
-  #   update_interval: 4h
-
   - platform: wifi_info
     ip_address:
       name: Wx_sta IP Address
     mac_address:
       name: Wx_Sta Mac Wifi Address
-      
 
-#output:
-#  - platform: gpio
-#    pin: D7
-#    id: status_led_remote
-#interval:
-#  - interval: 30s
-#    then:
-#      - output.turn_on: status_led_remote
-#      - delay: 150ms
-#      - output.turn_off: status_led_remote
-#  - interval: 60s
-#    then:
-#      - sensor.integration.reset: rain_per_min   
-#  - interval: 5s
-#    then:
-#      - display.page.show_next: my_display
-#      - component.update: my_display
-# binary_sensor:
-#   - platform: template
-#     id: heat_index
-
-#   - platform: template
-#     id: wind_chill
-
-# Enable time component to reset energy at midnight
 time:
   - platform: homeassistant
     id: my_time

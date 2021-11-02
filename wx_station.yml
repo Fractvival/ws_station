@@ -1,151 +1,160 @@
-#####################
-## PROGMaxi & Bronek 
+############################################################################
 ## TEPLOTA A VLHKOST - AM2302 (odpor cca 10kOhm), PIN D2 nebo GPIO16
 ## RYCHLOST VETRU - WH-SP-WS01, PIN D6 nebo GPIO12
 ## SMER VETRU - WH-SP-WD, PIN A0
 ## SRAZKOMER - MS-WH-SP-RG, PIN D7 nebo GPIO13
 ## TESTOVANO NA WEMOS D1 R1
-## 
-##### 
-##### 
-#####################
-## Konfigurace ######
+############################################################################
+## Konfigurace #############################################################
 ## A0 - SMER VETRU
-## D0 - 
-## D1 - 
 ## D2 - TEPLOTA A VLHKOST
-## D3 - 
-## D4 - 
-## D5 - 
 ## D6 - RYCHLOST VETRU
 ## D7 - SRAZKOMER
-## D8 - 
-#####################
-esphome:
-  name: wx_station
-  platform: ESP8266
-  board: d1
+############################################################################
 
+## Nazev projektu, platforma a cilova deska
+## Tim prekladaci rekneme, jakym zpusobem chceme pristupovat k sitim a
+## taktez tim sdeline jake piny desky budou brany v potaz 
+esphome:
+name: wx_station
+platform: ESP8266
+board: d1
+
+## Nastaveni seznamu wifin
+## Deska nejprve vyhleda vsechny dostupne wifiny ve svem okoli
+## Teprve pote je porovna se seznamem nize a zkousi se pripojit 
+## dle nastavene priority
+## Priorita je typu float, tudiz muzeme pouzit desetinnou carku
+## v urcovani priorit. Priorita 0 ma nejnizsi prioritu
 wifi:
-  networks:
+networks:
   - ssid: Vergl2
     password: Hovnokleslo105
-    priority: 0.09
+    priority: 0.09 
   - ssid: Vergl
     password: Hovnokleslo105
     priority: 0.08
   - ssid: Cisco
     password: Hotentot1919
     priority: 0.07
+    ## ZDE nize vidime, ze prioritu muzeme urcit i zvlast sitim, ktere
+    ## jsou schovane (ktere nevysilaji SSID)
   - ssid: Cisco
     password: Hotentot1919
     hidden: true
     priority: 0.00
-  ap:
-    ssid: "WStation"
-    password: "Hotentot1919"
-    ap_timeout: 5min
+## ZDE, v pripade, ze se v okoli do defaultniho casoveho intervalu nenajde 
+## zadna znama wifi sit ze seznamu vyse, promeni se nase deska v AP
+## Tudiz ji pote bude mozne najit v seznamu wifi siti a bude mozne se k nize
+## pripojit primo pod heslem zde uvedenym a to po dobu ap_timeout
+ap:
+ssid: "WStation"
+password: "Hotentot1919"
+ap_timeout: 5min
 
-  
+
 captive_portal:
-
 logger:
 
+## Vcelku dulezite misto
+## Pri integraci do HomeAssistant je potreba zadat heslo, ktere je zde uvedeno
+## Pokud by se tak neucinilo, tak HA nebude schopne s deskou komunikovat
 api:
-  password: "Hotentot1919"
-  
+password: "Hotentot1919"
+
+## Heslo pouzite pri vzdalene aktualizaci firmwaru desky
+## Takze heslo bezne pouzivane pri uprave a uploadovani zdrojaku
 ota:
-  safe_mode: True
-  password: "Hotentot1919"
+safe_mode: True
+password: "Hotentot1919"
 
-i2c:
-  frequency: 100kHz #try for longer distance - currently works at 50' - 1 pair per 5v, Gnd, SDA, SCL
 
+## A NYNI uz jdeme rozporcovat jednotlive PINY desky pro konkretni periferie
 sensor:
 
   - platform: dht
     pin: 
-      number: GPIO16
+    number: GPIO16
     temperature:
-      name: "TEPLOTA"
+    name: "TEPLOTA"
     humidity:
-      name: "VLHKOST"
-    update_interval: 30s      
+    name: "VLHKOST"
+    update_interval: 60s      
 
   - platform: pulse_counter
     pin: 
-      #pin D5
-      number: GPIO12
-      mode: INPUT_PULLUP
-    unit_of_measurement: 'm/s'
+        number: GPIO12
+        mode: INPUT_PULLUP
+    unit_of_measurement: 'km/h'
     name: 'RYCHLOST_VETRU'
     icon: 'mdi:weather-windy'
     id: my_wind
     count_mode:
-      rising_edge: DISABLE
-      falling_edge: INCREMENT
-    internal_filter: 50us
+        rising_edge: DISABLE
+        falling_edge: INCREMENT
+        internal_filter: 50us
     update_interval: 60s 
     on_raw_value:
-      then:
+    then:
         - sensor.template.publish:
             id: template_sens
             state: !lambda "return x;"
-    #rotations_per_sec = pulses/2/60
-    #circ_m=0.09*2*3.14 = 0.5652
-    #mps = 1.18*circ_m*rotations_per_sec  
-    #mps = 1.18*0.5652/2/60 =0,0055578
-    accuracy_decimals: 2
+            #rotations_per_sec = pulses/2/60
+            #circ_m=0.09*2*3.14 = 0.5652
+            #mps = 1.18*circ_m*rotations_per_sec
+            #mps = 1.18*0.5652/2/60 =0,0055578
+            accuracy_decimals: 2
     filters:
-      - multiply: 0.0055578
-      - sliding_window_moving_average:
-          window_size: 2
-          send_every: 1
+        - multiply: 0.02000808
+        - sliding_window_moving_average:
+    window_size: 2
+    send_every: 1
 
   - platform: pulse_counter
     pin:
-      #pin D6
-      number: GPIO13
-      mode: INPUT_PULLUP
+        number: GPIO13
+        mode: INPUT_PULLUP
     unit_of_measurement: 'mm'
     name: 'SRAZKOMER'
     icon: 'mdi:weather-rainy'
     id: my_rain
     internal: true
     count_mode:
-      rising_edge: DISABLE
-      falling_edge: INCREMENT
-    internal_filter: 50us
-    update_interval: 9s
+        rising_edge: DISABLE
+        falling_edge: INCREMENT
+        internal_filter: 50us
+    update_interval: 60s
     filters:
-      - multiply: 0.2794
+        - multiply: 0.2794
     accuracy_decimals: 3
 
   - platform: template
     name: "Template Sensor"
     id: template_sens
     filters:
-#      - multiply: 0.2794
-#      - multiply: 60 (to get mm/h)
-      - multiply: 16.764
-      - sliding_window_moving_average:
-          window_size: 60
-          send_every: 1
+    #      - multiply: 0.2794
+    #      - multiply: 60 (to get mm/h)
+        - multiply: 16.764
+        - sliding_window_moving_average:
+    window_size: 60
+    send_every: 1
 
   - platform: integration
     name: "SRAZKY_ZA_MINUTU"
     id: rain_per_min
     time_unit: min
+    #expire_after: 30s
+    #min_save_interval: 60s
     unit_of_measurement: 'mm'
     sensor: my_rain
-    
+
   - platform: total_daily_energy
     name: "SRAZKY_ZA_DEN"
     power_id: my_rain
     unit_of_measurement: 'mm'
     icon: 'mdi:weather-rainy'
     filters:
-      - multiply: 60
+        - multiply: 60
 
   - platform: adc
     id: adc_sensor
@@ -154,9 +163,9 @@ sensor:
     internal: true
     update_interval: 60s
     filters:
-      # - multiply: 3.3 ##built into Wemos
-      #- multiply: 0.0009775171   #1/1023
-    accuracy_decimals: 3 ##IMPORTANT to get resolution for resistance sensor
+        # - multiply: 3.3 ##builtintoWemos
+        #- multiply: 0.0009775171   #1/1023
+    accuracy_decimals: 3 ##IMPORTANT to getresolutionforresistance sensor
 
   - platform: resistance
     sensor: adc_sensor
@@ -167,111 +176,110 @@ sensor:
     name: "STANICE_ODPOR"
     accuracy_decimals: 1
     filters:
-      - heartbeat: 90s #thinking of increasing interval to plot better
+        - heartbeat: 90s #thinkingofincreasing interval to plot better
     on_value:
-      - if:
-          condition:
-            sensor.in_range:
-              id: resistance_sensor
-              above: 3400
-              below: 3700
-          then:
-            - text_sensor.template.publish:
-                id: wind_dir_card
-                state: "S"
-            - sensor.template.publish:
-                id: wind_heading
-                state: 360.0
-                
-      - if:
-          condition:
-            sensor.in_range:
-              id: resistance_sensor
-              above: 4000
-              below: 4400
-          then:
-            - text_sensor.template.publish:
+        - if:
+            condition:
+                sensor.in_range:
+                id: resistance_sensor
+                above: 3400
+                below: 3700
+            then:
+                - text_sensor.template.publish:
+                    id: wind_dir_card
+                    state: "S"
+                - sensor.template.publish:
+                    id: wind_heading
+                    state: 360.0
+        - if:
+            condition:
+                sensor.in_range:
+                id: resistance_sensor
+                above: 4000
+                below: 4400
+            then:
+                - text_sensor.template.publish:
                 id: wind_dir_card
                 state: "SZ"         
-            - sensor.template.publish:
+                - sensor.template.publish:
                 id: wind_heading
                 state: 315.0            
-      - if:
-          condition:
-            sensor.in_range:
-              id: resistance_sensor
-              above: 4800
-              below: 4500
-          then:
-            - text_sensor.template.publish:
+        - if:
+            condition:
+                sensor.in_range:
+                id: resistance_sensor
+                above: 4800
+                below: 4500
+            then:
+                - text_sensor.template.publish:
                 id: wind_dir_card
                 state: "Z"                
-            - sensor.template.publish:
+                - sensor.template.publish:
                 id: wind_heading
                 state: 270.0          
-      - if:
-          condition:
-            sensor.in_range:
-              id: resistance_sensor
-              above: 2400
-              below: 2800
-          then:
-            - text_sensor.template.publish:
+        - if:
+            condition:
+                sensor.in_range:
+                id: resistance_sensor
+                above: 2400
+                below: 2800
+            then:
+                - text_sensor.template.publish:
                 id: wind_dir_card
                 state: "JZ"    
-            - sensor.template.publish:
+                - sensor.template.publish:
                 id: wind_heading
                 state: 225.0             
-      - if:
-          condition:
-            sensor.in_range:
-              id: resistance_sensor
-              above: 800
-              below: 1200
-          then:
-            - text_sensor.template.publish:
+        - if:
+            condition:
+                sensor.in_range:
+                id: resistance_sensor
+                above: 800
+                below: 1200
+            then:
+                - text_sensor.template.publish:
                 id: wind_dir_card
                 state: "J"    
-            - sensor.template.publish:
+                - sensor.template.publish:
                 id: wind_heading
                 state: 180.0            
-      - if:
-          condition:
-            sensor.in_range:
-              id: resistance_sensor
-              above: 500
-              below: 700
-          then:
-            - text_sensor.template.publish:
+        - if:
+            condition:
+                sensor.in_range:
+                id: resistance_sensor
+                above: 500
+                below: 700
+            then:
+                - text_sensor.template.publish:
                 id: wind_dir_card
                 state: "JV"    
-            - sensor.template.publish:
+                - sensor.template.publish:
                 id: wind_heading
-                state: 135.0              
-      - if:
-          condition:
-            sensor.in_range:
-              id: resistance_sensor
-              above: 100
-              below: 400
-          then:
-            - text_sensor.template.publish:
+            state: 135.0              
+        - if:
+            condition:
+                sensor.in_range:
+                id: resistance_sensor
+                above: 100
+                below: 400
+            then:
+                - text_sensor.template.publish:
                 id: wind_dir_card
                 state: "V"    
-            - sensor.template.publish:
+                - sensor.template.publish:
                 id: wind_heading
                 state: 90.0          
-      - if:
-          condition:
-            sensor.in_range:
-              id: resistance_sensor
-              above: 1500
-              below: 1900
-          then:
-            - text_sensor.template.publish:
+        - if:
+            condition:
+                sensor.in_range:
+                id: resistance_sensor
+                above: 1500
+                below: 1900
+            then:
+                - text_sensor.template.publish:
                 id: wind_dir_card
                 state: "SV"    
-            - sensor.template.publish:
+                - sensor.template.publish:
                 id: wind_heading
                 state: 45.0
 
@@ -283,13 +291,13 @@ sensor:
   - platform: homeassistant
     name: "VITR_3M"
     id: wind_3m_avg
-    internal: true 
+    internal: true
     unit_of_measurement: "km/h"
-    entity_id: sensor.wx_sta_wind_stats  
+    entity_id: sensor.wx_sta_wind_stats
 
   - platform: homeassistant
     id: wind_60m_gust
-    internal: true 
+    internal: true
     unit_of_measurement: "km/h"
     entity_id: sensor.wx_sta_wind_60m_stats    
 
@@ -300,9 +308,9 @@ text_sensor:
 
   - platform: wifi_info
     ip_address:
-      name: Wx_sta IP Address
+    name: Wx_sta IP Address
     mac_address:
-      name: Wx_Sta Mac Wifi Address
+    name: Wx_Sta Mac WifiAddress
 
 time:
   - platform: homeassistant
